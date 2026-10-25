@@ -1,0 +1,16 @@
+{
+  "name": "messenger-no-feed",
+  "version": "1.0.0",
+  "description": "Facebook Messenger in its own desktop window, with the news feed blocked",
+  "main": "main.js",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "package": "electron-packager . Messenger --platform=win32 --arch=x64 --out=dist --overwrite --icon=icon.ico"
+  },
+  "devDependencies": {
+    "@electron/packager": "^20.3.0",
+    "electron": "^45.0.0"
+  }
+}
