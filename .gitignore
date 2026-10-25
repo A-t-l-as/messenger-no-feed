@@ -1,5 +1,8 @@
 node_modules/
 dist/
+build-icons/
+Messenger-*.zip
+Messenger-*.tar.gz
 npm-debug.log*
 .DS_Store
 Thumbs.db

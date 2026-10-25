@@ -1,12 +1,13 @@
-# Builds the Windows app and publishes it as a GitHub Release.
+# Builds the app for Windows, macOS and Linux and publishes one GitHub Release
+# with all three archives.
 #
 # How to trigger it: push a version tag, e.g.
 #   git tag v1.0.0
 #   git push origin v1.0.0
 #
 # You can also run it by hand from the "Actions" tab (Run workflow);
-# a manual run only builds the app and keeps it as a downloadable artifact,
-# it doesn't create a release.
+# a manual run only builds the archives and keeps them as downloadable
+# artifacts, it doesn't create a release.
 
 name: Release
 
@@ -16,13 +17,14 @@ on:
       - 'v*'
   workflow_dispatch:
 
-# Needed to create the release and upload the zip to it.
-permissions:
-  contents: write
-
 jobs:
+  # Step 1: build on three machines at the same time.
   build:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false # one failing system doesn't cancel the others
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Check out the code
@@ -37,36 +39,37 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # The version comes from the tag (v1.2.3 -> 1.2.3), so you don't have to
-      # remember to bump package.json. A manual run uses package.json instead.
-      # The custom icon is used only if icon.ico is in the repo.
-      - name: Build the app
-        shell: pwsh
-        run: |
-          if ($env:GITHUB_REF_TYPE -eq 'tag') {
-            $version = $env:GITHUB_REF_NAME.TrimStart('v')
-          } else {
-            $version = (Get-Content package.json | ConvertFrom-Json).version
-          }
-          $iconArg = if (Test-Path icon.ico) { '--icon=icon.ico' } else { '' }
-          npx electron-packager . Messenger --platform=win32 --arch=x64 --out=dist --overwrite --app-version=$version $iconArg
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          "VERSION=$version" >> $env:GITHUB_ENV
+      # build.js picks the system, version (from the tag) and icon by itself,
+      # then packs the app into Messenger-<version>-<os>-<arch>.zip / .tar.gz
+      - name: Build and archive
+        run: npm run dist
 
-      - name: Zip the app
-        shell: pwsh
-        run: Compress-Archive -Path dist/Messenger-win32-x64/* -DestinationPath "Messenger-$env:VERSION-win-x64.zip"
-
-      - name: Publish the release
-        if: github.ref_type == 'tag'
-        uses: softprops/action-gh-release@v3
-        with:
-          files: Messenger-${{ env.VERSION }}-win-x64.zip
-          generate_release_notes: true
-
-      - name: Keep the build (manual runs)
-        if: github.ref_type != 'tag'
+      - name: Upload the archive
         uses: actions/upload-artifact@v7
         with:
-          name: Messenger-${{ env.VERSION }}-win-x64
-          path: Messenger-${{ env.VERSION }}-win-x64.zip
+          name: build-${{ matrix.os }}
+          path: |
+            Messenger-*.zip
+            Messenger-*.tar.gz
+          if-no-files-found: error
+
+  # Step 2: once all three builds are done, collect them into one release.
+  release:
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # needed to create the release
+
+    steps:
+      - name: Download all archives
+        uses: actions/download-artifact@v8
+        with:
+          path: release
+          merge-multiple: true
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: release/*
+          generate_release_notes: true

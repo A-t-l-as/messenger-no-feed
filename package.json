@@ -7,10 +7,12 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "package": "electron-packager . Messenger --platform=win32 --arch=x64 --out=dist --overwrite --icon=icon.ico"
+    "package": "node build.js",
+    "dist": "node build.js --archive"
   },
   "devDependencies": {
     "@electron/packager": "^20.3.0",
-    "electron": "^45.0.0"
+    "electron": "^45.0.0",
+    "png2icons": "^2.0.1"
   }
 }

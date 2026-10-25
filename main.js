@@ -29,8 +29,10 @@ const ALLOWED_PATHS = [
   '/auth',
 ];
 
-// Optional window icon. If icon.ico isn't there, the default Electron icon is used.
-const ICON_PATH = path.join(__dirname, 'icon.ico');
+// Optional window icon. If icon.png isn't there, the default Electron icon is used.
+// (On macOS the window icon is ignored; the Dock uses the icon baked into
+// the .app by build.js.)
+const ICON_PATH = path.join(__dirname, 'icon.png');
 
 // Does the URL belong to Facebook/Messenger?
 function isFacebook(url) {
@@ -63,8 +65,10 @@ app.userAgentFallback = app.userAgentFallback
   .replace(/ Electron\/\S+/, '')
   .replace(` ${app.name}/${app.getVersion()}`, '');
 
-// Windows needs an app ID to show notifications.
-app.setAppUserModelId('com.messengernofeed.app');
+// Windows needs an app ID to show notifications. Other systems don't use it.
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.messengernofeed.app');
+}
 
 // Allow only one instance. Clicking the icon again focuses the open
 // window instead of starting another copy.
@@ -80,7 +84,7 @@ function createWindow() {
     height: 750,
     title: 'Messenger',
     icon: fs.existsSync(ICON_PATH) ? ICON_PATH : undefined,
-    autoHideMenuBar: true, // hides the menu bar (press Alt to show it)
+    autoHideMenuBar: true, // Windows/Linux: hides the menu bar (press Alt to show it)
     webPreferences: {
       contextIsolation: true, // standard security settings:
       nodeIntegration: false, // the page has no access to your computer
@@ -138,5 +142,6 @@ app.on('second-instance', () => {
 
 app.whenReady().then(createWindow);
 
-// Closing the window quits the app.
+// Closing the window quits the app, on every system (including macOS,
+// where apps usually keep running; for a single-window tool this is simpler).
 app.on('window-all-closed', () => app.quit());
