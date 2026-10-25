@@ -1,0 +1,72 @@
+# Builds the Windows app and publishes it as a GitHub Release.
+#
+# How to trigger it: push a version tag, e.g.
+#   git tag v1.0.0
+#   git push origin v1.0.0
+#
+# You can also run it by hand from the "Actions" tab (Run workflow);
+# a manual run only builds the app and keeps it as a downloadable artifact,
+# it doesn't create a release.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+# Needed to create the release and upload the zip to it.
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The version comes from the tag (v1.2.3 -> 1.2.3), so you don't have to
+      # remember to bump package.json. A manual run uses package.json instead.
+      # The custom icon is used only if icon.ico is in the repo.
+      - name: Build the app
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          } else {
+            $version = (Get-Content package.json | ConvertFrom-Json).version
+          }
+          $iconArg = if (Test-Path icon.ico) { '--icon=icon.ico' } else { '' }
+          npx electron-packager . Messenger --platform=win32 --arch=x64 --out=dist --overwrite --app-version=$version $iconArg
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Zip the app
+        shell: pwsh
+        run: Compress-Archive -Path dist/Messenger-win32-x64/* -DestinationPath "Messenger-$env:VERSION-win-x64.zip"
+
+      - name: Publish the release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v3
+        with:
+          files: Messenger-${{ env.VERSION }}-win-x64.zip
+          generate_release_notes: true
+
+      - name: Keep the build (manual runs)
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v7
+        with:
+          name: Messenger-${{ env.VERSION }}-win-x64
+          path: Messenger-${{ env.VERSION }}-win-x64.zip

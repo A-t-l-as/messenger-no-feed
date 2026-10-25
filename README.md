@@ -28,12 +28,20 @@ A page can be reached in four different ways, so there are four guards:
 
 A small loop guard makes sure the app doesn't bounce more than once every 2 seconds, in case Facebook redirects repeatedly.
 
-## Requirements
+## Download
+
+Grab the latest `Messenger-x.y.z-win-x64.zip` from the [Releases](https://github.com/A-t-l-as/messenger-no-feed/releases/latest) page, unzip it anywhere and run `Messenger.exe`. To get a desktop shortcut, right-click `Messenger.exe` → **Send to** → **Desktop (create shortcut)**.
+
+> The app isn't code-signed, so Windows SmartScreen may warn you on first launch. Click **More info** → **Run anyway**. If you'd rather not trust a prebuilt file, build it yourself from source (below).
+
+## Building from source
+
+### Requirements
 
 - Windows 10 or 11
 - [Node.js](https://nodejs.org/) (LTS version)
 
-## Getting started
+### Getting started
 
 ```bash
 git clone https://github.com/A-t-l-as/messenger-no-feed.git
@@ -44,13 +52,24 @@ npm start
 
 Sign in and try clicking the Facebook logo: you should land right back in your messages.
 
-## Building the .exe
+### Building the .exe
 
 ```bash
 npm run package
 ```
 
-The app ends up in `dist/Messenger-win32-x64/`. To get a desktop shortcut, right-click `Messenger.exe` → **Send to** → **Desktop (create shortcut)**.
+The app ends up in `dist/Messenger-win32-x64/`.
+
+## Releasing
+
+Releases are built automatically by GitHub Actions (`.github/workflows/release.yml`). Push a version tag and the workflow builds the app on Windows, zips it and publishes a release with auto-generated notes:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The app version is taken from the tag, so there's no need to edit `package.json`. You can also run the workflow by hand from the **Actions** tab; a manual run only builds the zip and keeps it as a downloadable artifact.
 
 ## Custom icon
 
