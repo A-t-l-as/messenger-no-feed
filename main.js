@@ -30,6 +30,13 @@ const ALLOWED_PATHS = [
   '/auth',
 ];
 
+// Exceptions to the list above: addresses that start with an allowed path but
+// still lead somewhere we don't want. Checked FIRST, so they always win.
+// Each entry is a piece of text searched for in the path + query string.
+const BLOCKED = [
+  'flow=fb_dma_marketplace', // /privacy/consent screen that leads into Marketplace
+];
+
 // Optional window icon. If icon.png isn't there, the default Electron icon is used.
 // (On macOS the window icon is ignored; the Dock uses the icon baked into
 // the .app by build.js.)
@@ -47,7 +54,8 @@ function isFacebook(url) {
 // Is the app allowed to show this URL?
 function isAllowed(url) {
   if (!isFacebook(url)) return false;
-  const { pathname } = new URL(url);
+  const { pathname, search } = new URL(url);
+  if (BLOCKED.some((b) => (pathname + search).includes(b))) return false;
   return ALLOWED_PATHS.some((p) => pathname.startsWith(p));
 }
 
@@ -92,15 +100,40 @@ function createWindow() {
     },
   });
 
-  // Loop guard: if Facebook keeps redirecting us to a blocked page,
-  // don't bounce back more often than once every 2 seconds.
+  // Send the window back to messages.
+  //
+  // Loop guard: if Facebook keeps redirecting us to a blocked page, we don't
+  // reload more often than once every 2 seconds. A bounce that comes too soon
+  // is NOT dropped, it's postponed until the 2 seconds are up. Otherwise
+  // clicking the feed twice in a row would let the second click through.
+  const BOUNCE_INTERVAL = 2000;
   let lastBounce = 0;
+  let bounceTimer = null;
+
   function bounceToMessages() {
-    const now = Date.now();
-    if (now - lastBounce < 2000) return;
-    lastBounce = now;
-    win.loadURL(START_URL);
+    if (bounceTimer) return; // a bounce is already on its way
+
+    const wait = Math.max(0, lastBounce + BOUNCE_INTERVAL - Date.now());
+    bounceTimer = setTimeout(() => {
+      bounceTimer = null;
+      if (win.isDestroyed()) return;
+      // Check where we are NOW: if you're already back in messages
+      // (or a blocked click was cancelled), there's nothing to do.
+      if (isAllowed(win.webContents.getURL())) return;
+      lastBounce = Date.now();
+      win.loadURL(START_URL);
+    }, wait);
   }
+
+  // Safety net: once a second, check the address of the window. Facebook has
+  // many ways to change pages, and if any of them slips past the guards
+  // below, this catches it within a second.
+  const watchdog = setInterval(() => {
+    if (win.isDestroyed()) return;
+    const url = win.webContents.getURL();
+    if (isFacebook(url) && !isAllowed(url)) bounceToMessages();
+  }, 1000);
+  win.on('closed', () => clearInterval(watchdog));
 
   // 1) Regular navigation (clicking a link, reloading).
   //    This event fires BEFORE navigating, so we can cancel it.
