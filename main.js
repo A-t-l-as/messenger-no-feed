@@ -20,6 +20,7 @@ const FB_HOSTS = ['www.facebook.com', 'facebook.com', 'www.messenger.com', 'mess
 // (see the README) and add the missing path here.
 const ALLOWED_PATHS = [
   '/messages',
+  '/messenger_media', // full-screen viewer for photos and videos sent in a chat
   '/login',
   '/checkpoint',
   '/two_step_verification',
